@@ -23,6 +23,7 @@ public class EnvData {
         for (int val : mValues) {
             if (first) {
                 s.append(" Sensorvalues: ");
+                first = false;
             } else {
                 s.append(" | ");
             }

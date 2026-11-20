@@ -1,6 +1,5 @@
 package at.fhooe.sail.vis.general;
 
-import at.fhooe.sail.vis.general.EnvData;
 
 import java.io.IOException;
 

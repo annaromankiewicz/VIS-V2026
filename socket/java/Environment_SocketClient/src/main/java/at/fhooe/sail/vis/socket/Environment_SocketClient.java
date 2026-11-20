@@ -7,17 +7,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
-import java.util.Scanner;
-
-import static java.lang.System.in;
-import static java.lang.System.out;
 
 
 public class Environment_SocketClient implements IEnvService {
 
-    byte[] byteBuffer = new byte[1024];
-    InputStream in;
-    OutputStream out;
+    private InputStream in;
+    private OutputStream out;
 
 
     public Environment_SocketClient(String _ip, int _port) throws IOException {
@@ -87,6 +82,9 @@ public class Environment_SocketClient implements IEnvService {
 
 
     private EnvData envDataFabric(String _response) {
+        if (_response.equalsIgnoreCase("no such datatype#")) {    // is never happening - parameter is from answer of server
+            return null;
+        }
         // 123456789|123;235;23
         String[] responseSplited = _response.split("[|;]"); // {timestamp, value, value, value}
         int[] values = new int[responseSplited.length-1]; // {value, value, value}
@@ -99,7 +97,7 @@ public class Environment_SocketClient implements IEnvService {
     }
 
     private EnvData envDataFabricAll(String response) {
-        String[] responseSplited = response.split("[|;]"); // {name, value, value, value}
+        String[] responseSplited = response.split("[;]"); // {name, value, value, value}
         int[] values = new int[responseSplited.length-1];
         for (int i = 1; i< responseSplited.length; i++) {
             values[i-1] = Integer.parseInt(responseSplited[i]);
@@ -115,10 +113,14 @@ public class Environment_SocketClient implements IEnvService {
     }
 
 
-    public String readResponse() throws IOException {
-        byte[] byteBuffer = new byte[1024];
-        int rVal = in.read(byteBuffer);             // check rVal ?
-            return new String(byteBuffer, 0, rVal);
+    private String readResponse() throws IOException {
+        StringBuilder sb = new StringBuilder();
+        int c;
+        while ((c = in.read()) != -1) {
+            sb.append((char) c);        // bytes -> chars; better than bytebuffer because bytebuffer can be full before message is sent completely
+            if (c == '#') return sb.toString();     // last character of message
+        }
+        throw new IOException("Connection closed by server before '#'");
     }
 
 
