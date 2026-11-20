@@ -22,7 +22,8 @@ add_executable(Hello
 add_executable(Demo_SocketServer
         ${DemoS}/cpp/Demo_SocketServer.cpp)
 add_executable(Demo_SocketClient
-        ${DemoC}/cpp/Demo_SocketClient.cpp)
+        ${DemoC}/cpp/Demo_SocketClient.cpp
+        socket/cpp/Environment_SocketServer/src/main/headers/DummySensor.h)
 
 # Exercise 1.2 a, b
 add_executable(Primitive_SocketServer

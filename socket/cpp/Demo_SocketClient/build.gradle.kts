@@ -60,7 +60,7 @@ tasks.register<Exec>("run") {
     )
 
     // Übergabeparameter beim Programmstart definieren ...
-    args = listOf("127.0.0.1", "6474")
+   args = listOf("127.0.0.1", "4949")
 
     // Kommando setzen
     executable = exe.get().asFile.absolutePath

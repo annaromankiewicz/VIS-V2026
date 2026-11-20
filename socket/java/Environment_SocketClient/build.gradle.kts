@@ -9,15 +9,16 @@ repositories {
 }
 
 dependencies {
-
+    implementation(project(":general:EnvironmentI"))
 }
+
 
 application {
     // Define the main class for the application.
-    mainClass.set("at.fhooe.sail.vis.socket.Primitive_SocketClient")
+    mainClass.set("at.fhooe.sail.vis.socket.Environment_SocketClient")
 }
 
 tasks.named<JavaExec>("run") {
-    args("127.0.0.1", "4949") // program arguments
+    args("127.0.0.1", "8954") // program arguments
     standardInput = System.`in` // use commandline input
 }

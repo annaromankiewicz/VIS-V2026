@@ -7,7 +7,7 @@ plugins {
 // ************************************************************
 // ENTER Name of the sub project ...
 // ************************************************************
-val subProjectName: String = "Primitive_SocketClient"
+val subProjectName: String = "Environment_SocketServer"
 // ************************************************************
 //
 // ************************************************************
@@ -60,7 +60,7 @@ tasks.register<Exec>("run") {
     )
 
     // Übergabeparameter beim Programmstart definieren ...
-    args = listOf("127.0.0.1", "4949")
+    args = listOf("4949")
 
     // Kommando setzen
     executable = exe.get().asFile.absolutePath
@@ -94,3 +94,27 @@ tasks.register("run-old", Exec::class) {
     }
 }
 */
+
+// task to run cpp program
+tasks.register("kill", Exec::class) {
+    group = "application"                // set task group
+    val port = 4949
+    when {
+		// /c instead of /k on some Win11 machines ...
+        Os.isFamily(Os.FAMILY_WINDOWS) -> {
+            commandLine("cmd", "/k", "for /f \"tokens=5\" %a in ('netstat -aon ^| findstr ${port}') do taskkill /F /PID %a")
+        }
+        Os.isFamily(Os.FAMILY_MAC) -> {
+            commandLine("bash", "-c", "lsof -nti:${port} | xargs kill -9")
+        }
+        Os.isFamily(Os.FAMILY_UNIX) -> {
+            commandLine("bash", "-c", "lsof -nti:${port} | xargs kill -9")
+            // commandLine("sh", "-c", "kill \"\$(lsof -t -i:$port)\"") // possible alternative
+        }
+        else -> { throw GradleException(":cpp:${subProjectName} kill-target -> unknown OS family encountered")}
+    }
+}
+
+tasks["run"].dependsOn("kill")   // CAREFUL: only suitable for the server side!
+tasks["clean"].dependsOn("kill") // CAREFUL: only suitable for the server side!
+

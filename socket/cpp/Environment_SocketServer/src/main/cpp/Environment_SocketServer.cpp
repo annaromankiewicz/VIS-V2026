@@ -1,5 +1,8 @@
 #include "../headers/Environment_SocketServer.h"
+#include <poll.h>
+#include <cerrno>
 
+// constructor start
 Environment_SocketServer::Environment_SocketServer(int _port) {
 
     // Dummy sensoren initialisieren
@@ -33,32 +36,102 @@ Environment_SocketServer::Environment_SocketServer(int _port) {
     }
 }
 
+// constructor end
+
+
+
+
+// deconstructor start
 Environment_SocketServer::~Environment_SocketServer() {
-    cout << "Primitive_SocketServer::~Primitive_SocketServer()" << endl;
-    close(passive_socket);
+    cout << "Environment_SocketServer::~Environment_SocketServer()" << endl;
+    if (passive_socket != -1) {   // deconstructor is called only once
+        close(passive_socket);
+    }
 }
+// deconstructor end
+
 
 
 void Environment_SocketServer::Accept() {
-    cout << "Primitive_SocketServer::Accept()" << endl;
     cout << "Server listening for clients ..." << endl;
-    bool listening = true;
-    while (listening) {
-        int commSocket = accept(passive_socket, nullptr, nullptr);
+    mListening = true;
+
+    while (mListening) {
+        // 1. wait until a client is waiting, but at most 500 ms
+        pollfd pfd{};
+        pfd.fd     = passive_socket;
+        pfd.events = POLLIN;
+        int ready = poll(&pfd, 1, 500);
+        if (ready == -1) {
+            if (errno == EINTR) continue;          // interrupted by a signal: try again
+            perror("poll failed");
+            break;
+        }
+        if (ready == 0) continue;                  // timeout: go back and check mListening
+
+        // 2. a client is waiting, so accept() will not block now
+
+        socketParam* parameter = new socketParam();
+        socklen_t addrLen = sizeof(parameter->saddr);
+        int commSocket = accept(passive_socket, &parameter->saddr, &addrLen);  // socket handle of client
         if (commSocket == -1) {
             perror("accept failed..");
+            delete parameter;
+            continue;                              // one failed accept must not stop the server
+        }
+
+        parameter->socket = commSocket;
+        parameter->server = this;
+
+        pthread_t threadID;
+        int rVal = pthread_create(&threadID, nullptr, ClientCommunication, (void*)parameter);   // 0 is success
+        if (rVal != 0) {
+            cerr << "pthread_create failed: " << strerror(rVal) << endl;
+            close(commSocket);
+            delete parameter;
         } else {
-            listening = Communicate(commSocket);
+            pthread_detach(threadID);
         }
     }
+    cout << "Accept loop ended" << endl;
+    // 3. the loop ended: stop accepting clients
+    close(passive_socket);
+    passive_socket = -1;
 }
+
+/* the method that is called from thread needs to be static
+ -> needs to get also the server as a parameter, because static fields cant access to object fields
+ */
+
+    void* Environment_SocketServer::ClientCommunication(void* _parameter) {
+    socketParam* p = (socketParam*)_parameter;
+    int clientSocket = p->socket;
+    sockaddr clientAddr = p->saddr;
+    Environment_SocketServer* server = p->server;
+    delete p; // recommendation of AI - no garbage collector?
+
+
+    bool keepListening = server->Communicate(clientSocket);     // false if client shutdown
+    cout << "Communicate returned " << keepListening << endl;
+    if (!keepListening || !server->mListening) {  // (shutdown in this thread || not mListening)
+        server->mListening = false;
+        cout << "mListening set to false" << endl;
+        close(clientSocket);
+    }
+
+    // thread beenden -> springen wieder in accept
+
+    return nullptr;
+}
+
+
 
 
 bool Environment_SocketServer::Communicate(int _socket) {
     // comm aufrecht halten
     cout << "Primitive_SocketServer::Commnicate()" << endl;
-    sockaddr_in peerAddr;    //int peerAddrLen = sizeof(peerAddr);
-    socklen_t peerAddrLen = sizeof(peerAddr);
+    sockaddr_in peerAddr;
+    socklen_t peerAddrLen = sizeof(peerAddr);       //int peerAddrLen = sizeof(peerAddr);
 
     getpeername(_socket, (struct sockaddr *) &peerAddr, &peerAddrLen);
 
@@ -72,15 +145,28 @@ bool Environment_SocketServer::Communicate(int _socket) {
     bool listeningFlag = true;
     char buffer[BUFFER_SIZE];       // BUFFER_SIZE variable steht in h file
 
-    while (true) {
+    while (mListening && listeningFlag) {
+        pollfd pfd{};
+        pfd.fd     = _socket;
+        pfd.events = POLLIN;
+        int ready = poll(&pfd, 1, 500);
+
+        if (ready == 0) continue;                  // 500 ms without data: back to the condition
+        if (ready == -1) {
+            if (errno == EINTR) continue;
+            perror("poll failed");
+            break;
+        }
+
+
         rVal = recv(_socket, buffer, BUFFER_SIZE, 0);
         if (rVal == -1) {
             perror("Recv failed ...");
             break;
         } else if (rVal == 0) {
             perror("Connection closed ...");
+            break;
         }
-
 
         string message = string(buffer, rVal);      // rVal = wie viel payload ist im buffer - wenn wir den ges puffer lesen lesen wir auch alte daten
         cout << "Message received ..." << message << endl;
@@ -88,6 +174,7 @@ bool Environment_SocketServer::Communicate(int _socket) {
         // analyse message
 
         if (message == "drop") {        // verbindung zum client wird beendet
+            close(_socket);
             break;
         }
         if (message == "shutdown") {     // server runterfahren - listeningflag auf false - passive socket schliessen
@@ -144,9 +231,6 @@ bool Environment_SocketServer::Communicate(int _socket) {
         }
 
 
-
-
-
         if (rVal == -1) {                   // client beendet sich
             perror("Send failed ...");
             break;
@@ -154,8 +238,9 @@ bool Environment_SocketServer::Communicate(int _socket) {
 
     }
 
+    cout << "mListening or  listeningFlag = false -> Communicated ended -> close socket ..." << endl;
     // communication ended, close the socket ...
-    close(_socket);
+    // close(_socket);
     return listeningFlag;
 }
 
@@ -167,7 +252,6 @@ bool Environment_SocketServer::Communicate(int _socket) {
 int main(int _argc, char **_argv) {
     cout << "Starting Env_SocketServer ..." << endl;
 
-
     if (_argc != 2) {
         // first argument is running program, second is port
         cout << "Usage: ./Env_SocketServer <port>" << endl;
@@ -176,12 +260,16 @@ int main(int _argc, char **_argv) {
 
     int port = atoi(_argv[1]); // w/o check before we don´t know if its the right env variable
 
-    Environment_SocketServer server(port);
+    Environment_SocketServer server(port);      // constructor
 
     server.Accept();
 
-
     cout << "Shutting down Env_SocketServer ..." << endl;
+
+
+
     cin.get(); // server waits for answer before closed
+
+
     return 0;
 }
