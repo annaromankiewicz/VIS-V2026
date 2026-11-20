@@ -1,3 +1,7 @@
+/**
+ * @file Primitive_SocketClient.cpp
+ * @brief Interactive TCP client: sends lines typed by the user and prints the server's reply.
+ */
 #include <iostream> // cout, cin
 #include <iostream> // cout, cin
 #include <sys/socket.h> // socket, bind, listen, accept
@@ -13,6 +17,12 @@
 
 using namespace std;
 
+/**
+ * @brief Connects to the server and sends user input until "quit" is typed.
+ * @param _argc number of command line arguments (must be 3)
+ * @param _argv [1] IP address of the server, [2] port of the server
+ * @return 0 on normal termination
+ */
 int main(int _argc, char** _argv) {
     cout << "Starting Primitive_SocketClient ..."  << endl;
 
@@ -45,6 +55,7 @@ int main(int _argc, char** _argv) {
        char buffer[BUFFER_SIZE];
        int rVal = 0;
 
+       // one request/reply per loop; "quit" ends the client without informing the server
        while (true) {
           cout << "Type Message: ";
           cin.getline(buffer, BUFFER_SIZE);
@@ -66,6 +77,7 @@ int main(int _argc, char** _argv) {
              break;
           }
 
+          // recv blocks until the reply arrives; 0 means the server closed the connection
           rVal = recv(commSocket, buffer, BUFFER_SIZE, 0);
           if (rVal == -1) {
              perror("Recv failed...");

@@ -1,0 +1,125 @@
+# Doxygen-Kommentare – Aufbau und Inhalt
+
+Leitfaden für die DIS-Übungen
+
+## 1. Grundprinzip
+
+Ein Doxygen-Kommentar beginnt mit `/**` und endet mit `*/`. Darin stehen eine Beschreibung und sogenannte Tags, die mit `@` beginnen. Für den Compiler sind das ganz normale Kommentare – es braucht kein `#include` und keine Library. Das Programm Doxygen liest diese Kommentare später aus und erzeugt daraus eine HTML-Dokumentation.
+
+Da die Lehrveranstaltung auf Englisch läuft, empfiehlt es sich, die Kommentare ebenfalls auf Englisch zu schreiben.
+
+## 2. Die wichtigsten Tags
+
+| Tag | Wofür |
+|---|---|
+| `@brief` | kurze Zusammenfassung in einem Satz |
+| `@param _name` | Beschreibung eines Parameters (einmal pro Parameter) |
+| `@return` | was die Funktion zurückgibt |
+| `@file` | Beschreibung der Datei (ganz oben) |
+| `///<` | Kurzform für Member-Variablen (hinter der Variable) |
+
+## 3. Beispiele
+
+### 3.1 Klasse (im Header, über `class`)
+
+```cpp
+/**
+ * @brief TCP echo server that handles one client at a time.
+ *
+ * Creates a passive socket, waits for clients and echoes every
+ * received message. Supports the admin commands "drop" and "shutdown".
+ */
+class Primitive_SocketServer {
+```
+
+Nach `@brief` folgt eine Leerzeile, darunter eine längere Beschreibung. Diese ist optional, bei Klassen aber sinnvoll.
+
+### 3.2 Methode mit Parameter und Rückgabewert
+
+```cpp
+/**
+ * @brief Handles the communication with one connected client.
+ * @param _socket communication socket returned by accept()
+ * @return false if the client sent "shutdown", true otherwise
+ */
+bool Communicate(int _socket);
+```
+
+Für jeden Parameter gibt es eine eigene `@param`-Zeile. Der Name muss exakt mit dem Parameternamen übereinstimmen, sonst gibt Doxygen eine Warnung aus.
+
+### 3.3 Methode ohne Rückgabewert (`void`)
+
+```cpp
+/**
+ * @brief Waits for incoming clients and starts the communication.
+ */
+void Accept();
+```
+
+Bei `void`-Methoden entfällt `@return`.
+
+### 3.4 Konstruktor
+
+```cpp
+/**
+ * @brief Creates the passive socket, binds it to the port
+ *        and starts listening.
+ * @param _port port the server is reachable on
+ */
+Primitive_SocketServer(int _port);
+```
+
+Beim Konstruktor wird beschrieben, was beim Erzeugen des Objekts passiert.
+
+### 3.5 Member-Variablen
+
+```cpp
+int mPassiveSocket;  ///< passive socket waiting for new clients
+int mPort;           ///< port the server listens on
+```
+
+`///<` bedeutet: Dieser Kommentar gehört zur Variable links davon. Das ist die praktische Kurzform für einzelne Zeilen.
+
+### 3.6 Datei (ganz oben in jeder Datei)
+
+```cpp
+/**
+ * @file Primitive_SocketServer.h
+ * @brief Declaration of the Primitive_SocketServer class.
+ */
+```
+
+Nicht zwingend vorgeschrieben, aber guter Stil.
+
+### 3.7 Normale Kommentare im Code
+
+```cpp
+// recv blocks until data arrives; 0 means the client closed the connection
+rVal = recv(_socket, buffer, BUFFER_SIZE, 0);
+```
+
+Innerhalb von Funktionen werden normale `//`-Kommentare verwendet. Doxygen ignoriert sie, sie erfüllen aber die Anforderung, „nicht offensichtliche" Codeabschnitte zu dokumentieren.
+
+## 4. Was wird wo dokumentiert?
+
+- **Header (`.h`):** Klasse, alle Methoden (inkl. Parameter und Rückgabewerte), alle Member-Variablen
+- **Implementierung (`.cpp`):** `//`-Kommentare an nicht offensichtlichen Stellen
+- **Jede Datei:** optional ein `@file`-Kommentar ganz oben
+
+## 5. Was einen guten Kommentar ausmacht
+
+Beschreibt **was** und **warum** – nicht nur das, was ohnehin im Code steht.
+
+| Schlecht | Gut |
+|---|---|
+| `@param _port the port` | `@param _port port the server is reachable on` |
+| `@return a bool` | `@return false if the client sent "shutdown", true otherwise` |
+
+Laut Folien muss auch KI-generierte Doku „nützlich" sein – leere Floskeln fallen bei der Bewertung auf.
+
+## 6. Anforderungen laut Lehrveranstaltung
+
+- Alle Klassen, Methoden (inkl. Parameter und Rückgabewerte) und Member-/globalen Variablen müssen dokumentiert sein.
+- Alle nicht offensichtlichen Codeabschnitte werden kommentiert.
+- Dokumentation basiert auf Doxygen (C++) bzw. JavaDoc (Java).
+- Fehlende Dokumentation führt zu Abzügen (s / m / l).

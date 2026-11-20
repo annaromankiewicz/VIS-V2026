@@ -1,11 +1,21 @@
+/**
+ * @file Environment_SocketServer.cpp
+ * @brief Implementation of the Environment_SocketServer class and the main function.
+ */
 #include "../headers/Environment_SocketServer.h"
 #include <poll.h>
 #include <cerrno>
+#include <netinet/in.h>   // sockaddr_in, INADDR_ANY, htons, ntohs
+#include <unistd.h>       // close
+#include <arpa/inet.h>    // inet_ntop
+#include <string.h>       // strerror
+#include <pthread.h>      // pthread_create, pthread_detach
 
 // constructor start
 Environment_SocketServer::Environment_SocketServer(int _port) {
 
     // Dummy sensoren initialisieren
+    // sensor name, number of values per reading, min value, max value
     mSensors.push_back(DummySensor("light", 1, 0, 1000));
     mSensors.push_back(DummySensor("noise", 1, 0, 120));
     mSensors.push_back(DummySensor("air",   3, 0, 500));
@@ -30,6 +40,7 @@ Environment_SocketServer::Environment_SocketServer(int _port) {
     }
 
 
+    // backlog 5: up to 5 connection requests are queued until accept() is called
     res = listen(passive_socket, 5);
     if (res == -1) {
         perror("listen failed..");
@@ -71,6 +82,8 @@ void Environment_SocketServer::Accept() {
 
         // 2. a client is waiting, so accept() will not block now
 
+        // allocated on the heap because the thread may still run after this loop iteration;
+        // the thread (ClientCommunication) deletes it
         socketParam* parameter = new socketParam();
         socklen_t addrLen = sizeof(parameter->saddr);
         int commSocket = accept(passive_socket, &parameter->saddr, &addrLen);  // socket handle of client
@@ -90,6 +103,7 @@ void Environment_SocketServer::Accept() {
             close(commSocket);
             delete parameter;
         } else {
+            // detached: the thread cleans up its resources by itself, no pthread_join() needed
             pthread_detach(threadID);
         }
     }
@@ -113,10 +127,11 @@ void Environment_SocketServer::Accept() {
 
     bool keepListening = server->Communicate(clientSocket);     // false if client shutdown
     cout << "Communicate returned " << keepListening << endl;
+    // stop the server if this client sent "shutdown" or another thread already did;
+    // Accept() notices the flag within 500 ms (poll timeout)
     if (!keepListening || !server->mListening) {  // (shutdown in this thread || not mListening)
         server->mListening = false;
         cout << "mListening set to false" << endl;
-        close(clientSocket);
     }
 
     // thread beenden -> springen wieder in accept
@@ -133,6 +148,7 @@ bool Environment_SocketServer::Communicate(int _socket) {
     sockaddr_in peerAddr;
     socklen_t peerAddrLen = sizeof(peerAddr);       //int peerAddrLen = sizeof(peerAddr);
 
+    // read IP address and port of the client (for the log output)
     getpeername(_socket, (struct sockaddr *) &peerAddr, &peerAddrLen);
 
     int port = ntohs(peerAddr.sin_port);
@@ -146,6 +162,8 @@ bool Environment_SocketServer::Communicate(int _socket) {
     char buffer[BUFFER_SIZE];       // BUFFER_SIZE variable steht in h file
 
     while (mListening && listeningFlag) {
+        // wait at most 500 ms for data, so the loop regularly checks mListening
+        // (another client may have sent "shutdown")
         pollfd pfd{};
         pfd.fd     = _socket;
         pfd.events = POLLIN;
@@ -174,7 +192,6 @@ bool Environment_SocketServer::Communicate(int _socket) {
         // analyse message
 
         if (message == "drop") {        // verbindung zum client wird beendet
-            close(_socket);
             break;
         }
         if (message == "shutdown") {     // server runterfahren - listeningflag auf false - passive socket schliessen
@@ -184,6 +201,7 @@ bool Environment_SocketServer::Communicate(int _socket) {
 
         if (message == "reqEnvDataTypes()#") {
             // send reply
+            // reply format: <name1>;<name2>;...;<nameN>#
             string reply;
             int sensorsLen = mSensors.size();
             for (DummySensor& s : mSensors) {
@@ -199,6 +217,7 @@ bool Environment_SocketServer::Communicate(int _socket) {
         }
 
         if (message.rfind("reqEnvData(", 0) == 0 && message.substr(message.length() - 2) == ")#") {         // check if message starts with "reqEnvData(" and checks if it ends with ")#"
+            // reply format: <timestamp>|<v1>;<v2>;...# or "no such datatype#" if the sensor is unknown
             string reply;
             int sensorsLen = mSensors.size();
             string data = message.substr(11, message.length() - 13); // message(first character of <datatype>, length of datatype
@@ -219,6 +238,7 @@ bool Environment_SocketServer::Communicate(int _socket) {
 
         if (message == "reqAll()#") {         // check if message starts with "reqEnvData(" and checks if it ends with ")#"
 
+        // reply format: <timestamp>|<name1>;<values>|<name2>;<values>...#
             int sensorsLen = mSensors.size();
             string reply = std::to_string(time(nullptr));
             for (DummySensor& s : mSensors) {
@@ -240,7 +260,7 @@ bool Environment_SocketServer::Communicate(int _socket) {
 
     cout << "mListening or  listeningFlag = false -> Communicated ended -> close socket ..." << endl;
     // communication ended, close the socket ...
-    // close(_socket);
+     close(_socket);
     return listeningFlag;
 }
 
@@ -249,6 +269,12 @@ bool Environment_SocketServer::Communicate(int _socket) {
 
 
 
+/**
+ * @brief Starts the environment server on the port given on the command line.
+ * @param _argc number of command line arguments (must be 2)
+ * @param _argv [1] port the server is reachable on
+ * @return 0 after the server was shut down
+ */
 int main(int _argc, char **_argv) {
     cout << "Starting Env_SocketServer ..." << endl;
 

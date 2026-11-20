@@ -9,12 +9,30 @@ import java.io.OutputStream;
 import java.net.Socket;
 
 
+/**
+ * @brief TCP client for the C++ Environment_SocketServer.
+ *
+ * Implements IEnvService by sending text requests terminated with '#'
+ * and parsing the server's replies into EnvData objects.
+ */
 public class Environment_SocketClient implements IEnvService {
 
+    /**
+     * stream for reading the server's replies
+     */
     private InputStream in;
+    /**
+     * stream for sending requests to the server
+     */
     private OutputStream out;
 
 
+    /**
+     * @brief Connects to the environment server.
+     * @param _ip IP address or host name of the server
+     * @param _port port the server is reachable on
+     * @throws IOException if the connection cannot be established
+     */
     public Environment_SocketClient(String _ip, int _port) throws IOException {
 
         // communication with TCP C++ server -> TCP/IPv6
@@ -26,6 +44,11 @@ public class Environment_SocketClient implements IEnvService {
     }
 
 
+    /**
+     * @brief Sends "reqEnvDataTypes()#" and parses the list of sensor names.
+     * @return sensor names, e.g. {"light", "noise", "air"}
+     * @throws IOException if sending or receiving fails
+     */
     @Override
     public String[] reqEnvDataTypes() throws IOException {
         // send "reqEnvDataTypes()#"
@@ -41,6 +64,12 @@ public class Environment_SocketClient implements IEnvService {
         return sensors;
     }
 
+    /**
+     * @brief Sends "reqEnvData(<type>)#" and parses the reply.
+     * @param _type name of the sensor
+     * @return measurement of the sensor with name and timestamp set
+     * @throws IOException if sending or receiving fails
+     */
     @Override
     public EnvData reqEnvData(String _type) throws IOException {
         // reqEnvData(<datatype>)#
@@ -57,6 +86,11 @@ public class Environment_SocketClient implements IEnvService {
         return envData;
     }
 
+    /**
+     * @brief Sends "reqAll()#" and parses the values of all sensors.
+     * @return one EnvData per sensor, all with the timestamp of the reply
+     * @throws IOException if sending or receiving fails
+     */
     @Override
     public EnvData[] reqAll() throws IOException {
         out.write("reqAll()#".getBytes());
@@ -81,6 +115,12 @@ public class Environment_SocketClient implements IEnvService {
     }
 
 
+    /**
+     * @brief Creates an EnvData object from a reqEnvData reply.
+     * @param _response reply without '#', format "<timestamp>|<v1>;<v2>;..."
+     * @return EnvData with timestamp and values (sensor name is null),
+     *         or null if the server answered "no such datatype#".
+     */
     private EnvData envDataFabric(String _response) {
         if (_response.equalsIgnoreCase("no such datatype#")) {    // is never happening - parameter is from answer of server
             return null;
@@ -96,6 +136,11 @@ public class Environment_SocketClient implements IEnvService {
         return new EnvData(timestamp, null, values);
     }
 
+    /**
+     * @brief Creates an EnvData object from one part of a reqAll reply.
+     * @param response one sensor part, format "<name>;<v1>;<v2>;..."
+     * @return EnvData with name and values (timestamp is 0 and set by the caller)
+     */
     private EnvData envDataFabricAll(String response) {
         String[] responseSplited = response.split("[;]"); // {name, value, value, value}
         int[] values = new int[responseSplited.length-1];
@@ -106,6 +151,11 @@ public class Environment_SocketClient implements IEnvService {
     }
 
 
+    /**
+     * @brief Removes the last character (the '#' terminator) of a reply.
+     * @param response complete reply as returned by readResponse()
+     * @return reply without the terminating '#'
+     */
     private String cleanResponse(String response) {
         StringBuilder rsp = new StringBuilder(response);
         rsp.deleteCharAt(rsp.length()-1);       // delete hash
@@ -113,6 +163,11 @@ public class Environment_SocketClient implements IEnvService {
     }
 
 
+    /**
+     * @brief Reads one reply from the server, byte by byte, until '#'.
+     * @return complete reply including the terminating '#'
+     * @throws IOException if the server closes the connection before '#' arrives
+     */
     private String readResponse() throws IOException {
         StringBuilder sb = new StringBuilder();
         int c;
@@ -125,6 +180,11 @@ public class Environment_SocketClient implements IEnvService {
 
 
 
+/**
+ * @brief Connects to the server and prints all sensor data once.
+ * @param _argv [0] IP address of the server, [1] port of the server
+ * @throws IOException if the communication with the server fails
+ */
 public static void main(String[] _argv) throws IOException {
 
     System.out.println("Starting Environment_SocketClient ...");

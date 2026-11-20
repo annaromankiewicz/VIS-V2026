@@ -1,3 +1,7 @@
+/**
+ * @file Primitive_SocketServer.cpp
+ * @brief Implementation of the Primitive_SocketServer class and the main function.
+ */
 #include "../headers/Primitive_SocketServer.h"
 
 Primitive_SocketServer::Primitive_SocketServer(int _port) {
@@ -22,6 +26,7 @@ Primitive_SocketServer::Primitive_SocketServer(int _port) {
     }
 
 
+    // backlog 5: up to 5 connection requests are queued until accept() is called
     res = listen(passive_socket, 5);
     if (res == -1) {
         perror("listen failed..");
@@ -38,6 +43,7 @@ void Primitive_SocketServer::Accept() {
     cout << "Primitive_SocketServer::Accept()" << endl;
     cout << "Server listening for clients ..." << endl;
     bool listening = true;
+    // only one client at a time: the next accept() happens after Communicate() returns
     while (listening) {
         int commSocket = accept(passive_socket, nullptr, nullptr);
         if (commSocket == -1) {
@@ -55,6 +61,7 @@ bool Primitive_SocketServer::Communicate(int _socket) {
     sockaddr_in peerAddr;    //int peerAddrLen = sizeof(peerAddr);
     socklen_t peerAddrLen = sizeof(peerAddr);
 
+    // read IP address and port of the client (for the log output)
     getpeername(_socket, (struct sockaddr *) &peerAddr, &peerAddrLen);
 
     int port = ntohs(peerAddr.sin_port);
@@ -107,6 +114,12 @@ bool Primitive_SocketServer::Communicate(int _socket) {
 }
 
 
+/**
+ * @brief Starts the echo server on the port given on the command line.
+ * @param _argc number of command line arguments (must be 2)
+ * @param _argv [1] port the server is reachable on
+ * @return 0 after the server was shut down
+ */
 int main(int _argc, char **_argv) {
     cout << "Starting Primitive_SocketServer ..." << endl;
 

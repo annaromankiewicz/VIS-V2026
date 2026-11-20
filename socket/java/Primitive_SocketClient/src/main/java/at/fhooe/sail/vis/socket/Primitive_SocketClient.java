@@ -6,8 +6,19 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.util.Scanner;
 
+/**
+ * @brief Interactive TCP client: sends lines typed by the user and prints the reply.
+ *
+ * The whole communication runs inside the constructor until "quit" is typed.
+ */
 public class Primitive_SocketClient {
 	
+	/**
+	 * @brief Connects to the server and sends user input until "quit" is typed.
+	 * @param _ip IP address or host name of the server
+	 * @param _port port the server is reachable on
+	 * @throws IOException if the connection or the communication fails
+	 */
 	public Primitive_SocketClient(String _ip, int _port) throws IOException { // try and catch and not like this
 		Socket activeSocket = new Socket(_ip, _port);
 		InputStream in = activeSocket.getInputStream();
@@ -31,6 +42,7 @@ public class Primitive_SocketClient {
 				out.write(msg.getBytes());
 				out.flush();
 
+				// read() blocks until data arrives; assumes the whole reply fits into one read
 				int rVal = in.read(byteBuffer);
 				String reply = new String(byteBuffer, 0, rVal);
 				System.out.println("message from server: " + reply);
@@ -43,6 +55,11 @@ public class Primitive_SocketClient {
 		activeSocket.close();
 	}
 
+	/**
+	 * @brief Starts the client with the address given on the command line.
+	 * @param _argv [0] IP address of the server, [1] port of the server
+	 * @throws IOException if the communication with the server fails
+	 */
 	public static void main(String[] _argv) throws IOException {
         System.out.println("Starting Primitive_SocketClient ...");
 
