@@ -3,6 +3,8 @@
  * @brief Implementation of the Primitive_SocketServer class and the main function.
  */
 #include "../headers/Primitive_SocketServer.h"
+#include <cstdio>   // perror
+#include <cstdlib>  // exit, atoi, EXIT_FAILURE
 
 Primitive_SocketServer::Primitive_SocketServer(int _port) {
     // constructor: passive socket

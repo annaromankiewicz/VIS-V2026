@@ -10,6 +10,9 @@
 #include <arpa/inet.h>    // inet_ntop
 #include <string.h>       // strerror
 #include <pthread.h>      // pthread_create, pthread_detach
+#include <cstdio>         // perror
+#include <cstdlib>        // exit, atoi, EXIT_FAILURE
+#include <ctime>          // time
 
 // constructor start
 Environment_SocketServer::Environment_SocketServer(int _port) {

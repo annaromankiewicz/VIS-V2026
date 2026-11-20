@@ -9,27 +9,27 @@ Severity: **high** = the build fails or the program misbehaves · **medium** = w
 | # | Severity | Where | Issue | Explanation |
 |---|---|---|---|---|
 | E1 | **high** | `Environment_SocketServer.h` (uncommitted change) | The includes `<netinet/in.h>`, `<unistd.h>`, `<arpa/inet.h>`, `<string.h>` and `<pthread.h>` were removed, and the build fails | `Environment_SocketServer.cpp` uses `sockaddr_in`, `INADDR_ANY`, `htons`, `close`, `inet_ntop`, `strerror` and `pthread_create`. `c++ -fsyntax-only` fails with *"unknown type name 'sockaddr_in'"*, *"use of undeclared identifier 'close'"* and more. Either put the includes back in the header or add them to the `.cpp`. |
-| E2 | **high** | `.cpp` `ClientCommunication()` line 132, `Communicate()` line 262 | The client socket leaks on a normal disconnect | `close(clientSocket)` is only called when the server shuts down. When a client disconnects normally (`recv` returns 0) or an error occurs, the socket is never closed, because `close(_socket)` at the end of `Communicate()` is commented out. Each such client leaves one open file descriptor. |
-| E3 | **high** | `.cpp` `Communicate()` line 253 | An unknown command gets no reply | If the message matches no command, nothing is sent. `rVal` still holds the `recv` byte count, so the loop simply continues. A client that waits for the `#` terminator (the Java `readResponse()`) then blocks forever. |
-| E4 | medium | `.cpp` `Communicate()` line 178 | It assumes one `recv()` returns exactly one message | TCP is a byte stream. One request can arrive in several pieces, and two requests can arrive in one `recv()`. The server compares the raw buffer with the command strings and never looks for the `#` delimiter, so split or merged messages are not recognised. |
-| E5 | medium | `.cpp` constructor lines 41–42 | A failed `listen()` does not stop the server | `perror` is printed, but the program continues without a listening socket. `socket()` and `bind()` call `exit(EXIT_FAILURE)` in the same situation. |
-| E6 | medium | `.cpp` `Communicate()` line 183 | `perror("Connection closed ...")` | When `recv` returns 0, `errno` is not set, so `perror` appends a random or stale error text. `cout` / `cerr` would fit better. |
+| E2 | ~~high~~ ✅ **resolved** | `.cpp` `Communicate()` line 266 | ~~The client socket leaks on a normal disconnect~~ | Resolved by your change: the drop branch no longer closes the socket, `ClientCommunication()` no longer closes it, and `close(_socket)` at the end of `Communicate()` is active. Every way out of the loop now closes the socket exactly once. |
+| E3 | **high** | `.cpp` `Communicate()` line 257 | An unknown command gets no reply | If the message matches no command, nothing is sent. `rVal` still holds the `recv` byte count, so the loop simply continues. A client that waits for the `#` terminator (the Java `readResponse()`) then blocks forever. |
+| E4 | medium | `.cpp` `Communicate()` line 183 | It assumes one `recv()` returns exactly one message | TCP is a byte stream. One request can arrive in several pieces, and two requests can arrive in one `recv()`. The server compares the raw buffer with the command strings and never looks for the `#` delimiter, so split or merged messages are not recognised. |
+| E5 | medium | `.cpp` constructor lines 48–49 | A failed `listen()` does not stop the server | `perror` is printed, but the program continues without a listening socket. `socket()` and `bind()` call `exit(EXIT_FAILURE)` in the same situation. |
+| E6 | medium | `.cpp` `Communicate()` line 188 | `perror("Connection closed ...")` | When `recv` returns 0, `errno` is not set, so `perror` appends a random or stale error text. `cout` / `cerr` would fit better. |
 | E7 | medium | `DummySensor.h` `ReadValues()` / `mDist` | Possible data race | Several client threads can call `ReadValues()` on the same `DummySensor` at the same time. The generator is `thread_local`, but `mDist` is shared, and `uniform_int_distribution::operator()` is non-const. Strictly speaking, this is a data race. |
-| E8 | medium | `.cpp` `main()` line 296 / detached threads | Threads can outlive the server object | Client threads are detached and access `server->mListening`. They usually end within 500 ms after a shutdown, but nothing guarantees that they have finished before `server` is destroyed at the end of `main()`. |
-| E9 | low | `.cpp` lines 18 and 145 | Copy-paste log messages | The constructor prints `"Primitive_SocketServer::Primitive_SocketServer()"`, and `Communicate()` prints `"Primitive_SocketServer::Commnicate()"` (also misspelled). |
-| E10 | low | `.cpp` line 238 | Wrong comment | The comment on `if (message == "reqAll()#")` was copied from `reqEnvData` ("check if message starts with reqEnvData(..."). |
-| E11 | low | `.cpp` lines 120, 221, 241, `.h` line 64 | Unused variables | `clientAddr` in `ClientCommunication()`, `sensorsLen` in the reqEnvData and reqAll branches, and the member `port` are never used. The local `port` in `Communicate()` also shadows the member. |
+| E8 | medium | `.cpp` `main()` line 300 / detached threads | Threads can outlive the server object | Client threads are detached and access `server->mListening`. They usually end within 500 ms after a shutdown, but nothing guarantees that they have finished before `server` is destroyed at the end of `main()`. |
+| E9 | low | `.cpp` lines 26 and 150 | Copy-paste log messages | The constructor prints `"Primitive_SocketServer::Primitive_SocketServer()"`, and `Communicate()` prints `"Primitive_SocketServer::Commnicate()"` (also misspelled). |
+| E10 | low | `.cpp` line 242 | Wrong comment | The comment on `if (message == "reqAll()#")` was copied from `reqEnvData` ("check if message starts with reqEnvData(..."). |
+| E11 | low | `.cpp` lines 126, 225, 245, `.h` line 64 | Unused variables | `clientAddr` in `ClientCommunication()`, `sensorsLen` in the reqEnvData and reqAll branches, and the member `port` are never used. The local `port` in `Communicate()` also shadows the member. |
 | E12 | low | `.h` lines 63–64 | Naming convention | `passive_socket` and `port` do not use the `m` prefix that `mSensors` and `mListening` use. |
 | E13 | low | `DummySensor.h` lines 9–12 | Include guard is empty | `#endif` follows directly after `#define VIS_2026_DUMMYSENSOR_H`, so the guard protects nothing. Only `#pragma once` does the work. One of the two should be removed. |
 | E14 | low | `.h` line 15 | `using namespace std;` in a header | It leaks `std` into every file that includes the header. The `.cpp` relies on it (`cout`, `string`). |
-| E15 | low | `.cpp` line 286 | `atoi` without validation | An invalid port string becomes 0, and the server then binds to a random port. |
+| E15 | low | `.cpp` line 290 | `atoi` without validation | An invalid port string becomes 0, and the server then binds to a random port. |
 
 ## Primitive_SocketServer (C++)
 
 | # | Severity | Where | Issue | Explanation |
 |---|---|---|---|---|
-| P1 | **high** | `Primitive_SocketServer.cpp` `Communicate()` lines 82–84 | There is no `break` when the client disconnects | When `recv` returns 0, the code only prints a message and continues. `string(buffer, 0)` is empty, an `"Echo: "` is sent to the closed socket, and the loop repeats. The result is an endless loop, or the process is killed by `SIGPIPE`. The Environment server already has the `break`. |
-| P2 | medium | `.cpp` constructor line 32 | A failed `listen()` does not stop the server | Same as E5. |
+| P1 | **high** | `Primitive_SocketServer.cpp` `Communicate()` lines 84–86 | There is no `break` when the client disconnects | When `recv` returns 0, the code only prints a message and continues. `string(buffer, 0)` is empty, an `"Echo: "` is sent to the closed socket, and the loop repeats. The result is an endless loop, or the process is killed by `SIGPIPE`. The Environment server already has the `break`. |
+| P2 | medium | `.cpp` constructor line 34 | A failed `listen()` does not stop the server | Same as E5. |
 | P3 | low | `.cpp` `Communicate()` | Same `perror` and log-text problems as E6 and E9 | `perror("Connection closed ...")` is used without an `errno`, and the log text has the typo "Commnicate". |
 | P4 | low | `Primitive_SocketServer.h` line 19 | `using namespace std;` in a header | Same as E14. |
 
@@ -45,7 +45,7 @@ Severity: **high** = the build fails or the program misbehaves · **medium** = w
 
 | # | Severity | Where | Issue | Explanation |
 |---|---|---|---|---|
-| PC1 | medium | `Primitive_SocketClient.cpp` line 45 | The `inet_pton` result is only checked for `-1` | `inet_pton` returns **0** for an invalid address string such as `"abc"`. That case is not detected, and `connect` then uses an undefined address. |
+| PC1 | medium | `Primitive_SocketClient.cpp` line 47 | The `inet_pton` result is only checked for `-1` | `inet_pton` returns **0** for an invalid address string such as `"abc"`. That case is not detected, and `connect` then uses an undefined address. |
 | PC2 | low | includes | `<iostream>` is included twice, and `<semaphore.h>` and `<pthread.h>` are not used | |
 
 ## Primitive_SocketClient (Java)

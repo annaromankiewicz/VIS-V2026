@@ -61,17 +61,17 @@ Legend: **Doxygen block** = `/** ... */` above the element · **`///<`** = trail
 | Line | Element | What was added |
 |---|---|---|
 | 1–4 | file | @file, @brief |
-| 13 | constructor – sensor list | `//` meaning of the DummySensor arguments |
-| 38 | constructor – `listen()` | `//` meaning of the backlog 5 |
-| 82–83 | `Accept()` – `new socketParam` | `//` why it is on the heap and who deletes it |
-| 103 | `Accept()` – `pthread_detach()` | `//` why the thread is detached |
-| 127–128 | `ClientCommunication()` – shutdown check | `//` when the server stops and how Accept() notices it |
-| 149 | `Communicate()` – `getpeername()` | `//` reads client IP/port for logging |
-| 163–164 | `Communicate()` – `poll()` | `//` why the 500 ms timeout is used |
-| 203 | `Communicate()` – reqEnvDataTypes | `//` reply format |
-| 219 | `Communicate()` – reqEnvData | `//` reply format incl. "no such datatype#" |
-| 240 | `Communicate()` – reqAll | `//` reply format |
-| 271–276 | `main(...)` | @brief, @param _argc, @param _argv, @return |
+| 21 | constructor – sensor list | `//` meaning of the DummySensor arguments |
+| 46 | constructor – `listen()` | `//` meaning of the backlog 5 |
+| 88–89 | `Accept()` – `new socketParam` | `//` why it is on the heap and who deletes it |
+| 109 | `Accept()` – `pthread_detach()` | `//` why the thread is detached |
+| 133–134 | `ClientCommunication()` – shutdown check | `//` when the server stops and how Accept() notices it |
+| 154 | `Communicate()` – `getpeername()` | `//` reads client IP/port for logging |
+| 168–169 | `Communicate()` – `poll()` | `//` why the 500 ms timeout is used |
+| 207 | `Communicate()` – reqEnvDataTypes | `//` reply format |
+| 223 | `Communicate()` – reqEnvData | `//` reply format incl. "no such datatype#" |
+| 244 | `Communicate()` – reqAll | `//` reply format |
+| 275–280 | `main(...)` | @brief, @param _argc, @param _argv, @return |
 
 ## Primitive_SocketServer – C++
 
@@ -94,10 +94,10 @@ Legend: **Doxygen block** = `/** ... */` above the element · **`///<`** = trail
 | Line | Element | What was added |
 |---|---|---|
 | 1–4 | file | @file, @brief |
-| 29 | constructor – `listen()` | `//` meaning of the backlog 5 |
-| 46 | `Accept()` – loop | `//` only one client at a time |
-| 64 | `Communicate()` – `getpeername()` | `//` reads client IP/port for logging |
-| 117–122 | `main(...)` | @brief, @param _argc, @param _argv, @return |
+| 31 | constructor – `listen()` | `//` meaning of the backlog 5 |
+| 48 | `Accept()` – loop | `//` only one client at a time |
+| 66 | `Communicate()` – `getpeername()` | `//` reads client IP/port for logging |
+| 119–124 | `main(...)` | @brief, @param _argc, @param _argv, @return |
 
 ## Primitive_SocketServer – Java (`socket/java/Primitive_SocketServer/src/main/java/at/fhooe/sail/vis/socket/Primitive_SocketServer.java`)
 
@@ -112,9 +112,9 @@ Legend: **Doxygen block** = `/** ... */` above the element · **`///<`** = trail
 | Line | Element | What was added |
 |---|---|---|
 | 1–4 | file | @file, @brief |
-| 20–25 | `main(...)` | @brief, @param _argc, @param _argv, @return |
-| 58 | `main()` – send loop | `//` one request/reply per loop, "quit" ends the client |
-| 80 | `main()` – `recv()` | `//` blocks until the reply arrives, 0 = server closed the connection |
+| 22–27 | `main(...)` | @brief, @param _argc, @param _argv, @return |
+| 60 | `main()` – send loop | `//` one request/reply per loop, "quit" ends the client |
+| 82 | `main()` – `recv()` | `//` blocks until the reply arrives, 0 = server closed the connection |
 
 ## Primitive_SocketClient – Java (`socket/java/Primitive_SocketClient/src/main/java/at/fhooe/sail/vis/socket/Primitive_SocketClient.java`)
 

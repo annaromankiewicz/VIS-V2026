@@ -12,6 +12,8 @@
 #include <string.h> // strlen
 #include <semaphore.h> // sem_init
 #include <pthread.h>
+#include <cstdio> // perror
+#include <cstdlib> // exit, atoi, EXIT_FAILURE
 
 #define BUFFER_SIZE 1024
 
