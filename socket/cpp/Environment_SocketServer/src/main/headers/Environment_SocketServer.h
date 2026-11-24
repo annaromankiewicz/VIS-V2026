@@ -19,8 +19,10 @@ using namespace std;
  *
  * Creates a passive socket and starts one thread per connected client.
  * Supported requests (terminated with '#'): "reqEnvDataTypes()#",
- * "reqEnvData(<type>)#" and "reqAll()#". The admin commands "drop" (close
- * this connection) and "shutdown" (stop the whole server) are also supported.
+ * "reqEnvData(<type>)#" and "reqAll()#". Any other request is answered with
+ * "unknown command#", so a client waiting for the '#' terminator never blocks.
+ * The admin commands "drop" (close this connection) and "shutdown" (stop the
+ * whole server) are also supported.
  */
 class Environment_SocketServer {
 public:
@@ -60,8 +62,7 @@ private:
      */
     bool Communicate(int _socket);
 
-    int passive_socket;  ///< passive socket waiting for new clients (-1 when closed)
-    int port;  ///< port the server listens on
+    int mPassiveSocket;  ///< passive socket waiting for new clients (-1 when closed)
     std::vector<DummySensor> mSensors;  ///< dummy sensors whose values are sent to the clients
     std::atomic<bool> mListening{true};     ///< true while the server runs; set to false by a "shutdown" in any client thread
 };

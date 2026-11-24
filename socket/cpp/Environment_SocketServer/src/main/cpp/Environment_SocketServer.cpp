@@ -23,11 +23,10 @@ Environment_SocketServer::Environment_SocketServer(int _port) {
     mSensors.push_back(DummySensor("noise", 1, 0, 120));
     mSensors.push_back(DummySensor("air",   3, 0, 500));
     // constructor: passive socket
-    cout << "Primitive_SocketServer::Primitive_SocketServer()" << endl;
-    port = _port;
+    cout << "Environment_SocketServer::Environment_SocketServer()" << endl;
 
-    passive_socket = socket(AF_INET, SOCK_STREAM, 0); // erste socket
-    if (passive_socket == -1) {
+    mPassiveSocket = socket(AF_INET, SOCK_STREAM, 0); // erste socket
+    if (mPassiveSocket == -1) {
         perror("socket construction failed..");
         exit(EXIT_FAILURE);
     }
@@ -36,7 +35,7 @@ Environment_SocketServer::Environment_SocketServer(int _port) {
     serverAddr.sin_family = AF_INET; // adresse in apv4
     serverAddr.sin_addr.s_addr = INADDR_ANY; // 0.0.0.0 is equivalent
     serverAddr.sin_port = htons(_port); // irgendein freier port
-    int res = ::bind(passive_socket, (struct sockaddr *) &serverAddr, sizeof(serverAddr));
+    int res = ::bind(mPassiveSocket, (struct sockaddr *) &serverAddr, sizeof(serverAddr));
     if (res == -1) {
         perror("bind failed..");
         exit(EXIT_FAILURE);
@@ -44,9 +43,12 @@ Environment_SocketServer::Environment_SocketServer(int _port) {
 
 
     // backlog 5: up to 5 connection requests are queued until accept() is called
-    res = listen(passive_socket, 5);
+    res = listen(mPassiveSocket, 5);
     if (res == -1) {
         perror("listen failed..");
+        // without a listening socket no client can ever connect, so stop like socket()/bind() do
+        close(mPassiveSocket);
+        exit(EXIT_FAILURE);
     }
 }
 
@@ -58,8 +60,8 @@ Environment_SocketServer::Environment_SocketServer(int _port) {
 // deconstructor start
 Environment_SocketServer::~Environment_SocketServer() {
     cout << "Environment_SocketServer::~Environment_SocketServer()" << endl;
-    if (passive_socket != -1) {   // deconstructor is called only once
-        close(passive_socket);
+    if (mPassiveSocket != -1) {   // deconstructor is called only once
+        close(mPassiveSocket);
     }
 }
 // deconstructor end
@@ -73,7 +75,7 @@ void Environment_SocketServer::Accept() {
     while (mListening) {
         // 1. wait until a client is waiting, but at most 500 ms
         pollfd pfd{};
-        pfd.fd     = passive_socket;
+        pfd.fd     = mPassiveSocket;
         pfd.events = POLLIN;
         int ready = poll(&pfd, 1, 500);
         if (ready == -1) {
@@ -89,7 +91,7 @@ void Environment_SocketServer::Accept() {
         // the thread (ClientCommunication) deletes it
         socketParam* parameter = new socketParam();
         socklen_t addrLen = sizeof(parameter->saddr);
-        int commSocket = accept(passive_socket, &parameter->saddr, &addrLen);  // socket handle of client
+        int commSocket = accept(mPassiveSocket,&parameter->saddr, &addrLen);  // socket handle of client
         if (commSocket == -1) {
             perror("accept failed..");
             delete parameter;
@@ -112,8 +114,8 @@ void Environment_SocketServer::Accept() {
     }
     cout << "Accept loop ended" << endl;
     // 3. the loop ended: stop accepting clients
-    close(passive_socket);
-    passive_socket = -1;
+    close(mPassiveSocket);
+    mPassiveSocket = -1;
 }
 
 /* the method that is called from thread needs to be static
@@ -123,7 +125,6 @@ void Environment_SocketServer::Accept() {
     void* Environment_SocketServer::ClientCommunication(void* _parameter) {
     socketParam* p = (socketParam*)_parameter;
     int clientSocket = p->socket;
-    sockaddr clientAddr = p->saddr;
     Environment_SocketServer* server = p->server;
     delete p; // recommendation of AI - no garbage collector?
 
@@ -147,18 +148,18 @@ void Environment_SocketServer::Accept() {
 
 bool Environment_SocketServer::Communicate(int _socket) {
     // comm aufrecht halten
-    cout << "Primitive_SocketServer::Commnicate()" << endl;
+    cout << "Environment_SocketServer::Communicate()" << endl;
     sockaddr_in peerAddr;
     socklen_t peerAddrLen = sizeof(peerAddr);       //int peerAddrLen = sizeof(peerAddr);
 
     // read IP address and port of the client (for the log output)
     getpeername(_socket, (struct sockaddr *) &peerAddr, &peerAddrLen);
 
-    int port = ntohs(peerAddr.sin_port);
+    int peerPort = ntohs(peerAddr.sin_port);
     char ipPeer[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &peerAddr.sin_addr, ipPeer, sizeof(ipPeer));
 
-    cout << "Connection established with peer.." << ipPeer << " on Port " << port << endl;
+    cout << "Connection established with peer.." << ipPeer << " on Port " << peerPort << endl;
 
     int rVal = 0; // recieved Value
     bool listeningFlag = true;
@@ -219,10 +220,9 @@ bool Environment_SocketServer::Communicate(int _socket) {
 
         }
 
-        if (message.rfind("reqEnvData(", 0) == 0 && message.substr(message.length() - 2) == ")#") {         // check if message starts with "reqEnvData(" and checks if it ends with ")#"
+        else if (message.rfind("reqEnvData(", 0) == 0 && message.substr(message.length() - 2) == ")#") {         // check if message starts with "reqEnvData(" and checks if it ends with ")#"
             // reply format: <timestamp>|<v1>;<v2>;...# or "no such datatype#" if the sensor is unknown
             string reply;
-            int sensorsLen = mSensors.size();
             string data = message.substr(11, message.length() - 13); // message(first character of <datatype>, length of datatype
             for (DummySensor& s : mSensors) {
                 if (s.GetName() == data) {
@@ -239,10 +239,9 @@ bool Environment_SocketServer::Communicate(int _socket) {
 
         }
 
-        if (message == "reqAll()#") {         // check if message starts with "reqEnvData(" and checks if it ends with ")#"
+        else if (message == "reqAll()#") {         // check if the message is exactly "reqAll()#"
 
         // reply format: <timestamp>|<name1>;<values>|<name2>;<values>...#
-            int sensorsLen = mSensors.size();
             string reply = std::to_string(time(nullptr));
             for (DummySensor& s : mSensors) {
                 reply += "|" + s.GetName() + ";" + s.ReadValues();
@@ -251,6 +250,13 @@ bool Environment_SocketServer::Communicate(int _socket) {
 
             rVal = send(_socket, reply.c_str(), reply.length(), 0);     // TCP socket - was kann beim Schicken passieren? Kabelverbindung kaputt / Netzwerkverbindunh
 
+        }
+
+        else {
+            // unknown request: still answer with a '#'-terminated reply,
+            // otherwise a client that reads until '#' would block forever
+            string reply = "unknown command#";
+            rVal = send(_socket, reply.c_str(), reply.length(), 0);
         }
 
 

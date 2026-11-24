@@ -9,8 +9,8 @@ import java.net.Socket;
 /**
  * @brief TCP echo server that handles one client at a time.
  *
- * Echoes every message with the prefix "ECHO: ". The command "shutdown"
- * stops the server.
+ * Echoes every message with the prefix "ECHO: ". The command "drop" closes
+ * the connection to the current client, "shutdown" stops the server.
  */
 public class Primitive_SocketServer {
 
@@ -42,16 +42,19 @@ public class Primitive_SocketServer {
 
             byte[] buffer = new byte[1024];
             while (true) {
+                // read() blocks until at least 1 byte arrives; it returns -1 (never 0)
+                // when the client has closed the connection
                 int rVal = in.read(buffer);
                 if (rVal < 0) {
                     System.out.println("Connection killed...");
                     break;
-                } else if (rVal == 0) {
-                    System.out.println("Client disconnected...");
                 } else {
                     String msg = new String(buffer, 0, rVal);
                     if (msg.equalsIgnoreCase("drop")) {
                         System.out.println("Received ´drop´ command...");
+                        // leave the inner loop: the streams and the socket are closed below,
+                        // then the server waits for the next client
+                        break;
                     } else if (msg.equalsIgnoreCase("shutdown")) {
                         accepting = false;
                         System.out.println("Received ´shutdown´ command...");

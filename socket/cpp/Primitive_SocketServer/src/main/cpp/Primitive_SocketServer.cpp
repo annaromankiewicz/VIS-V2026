@@ -32,6 +32,9 @@ Primitive_SocketServer::Primitive_SocketServer(int _port) {
     res = listen(passive_socket, 5);
     if (res == -1) {
         perror("listen failed..");
+        // without a listening socket no client can ever connect, so stop like socket()/bind() do
+        close(passive_socket);
+        exit(EXIT_FAILURE);
     }
 }
 
@@ -83,6 +86,8 @@ bool Primitive_SocketServer::Communicate(int _socket) {
             break;
         } else if (rVal == 0) {
             perror("Connection closed ...");
+            // the client closed the connection: stop here instead of echoing to a dead socket
+            break;
         }
 
 

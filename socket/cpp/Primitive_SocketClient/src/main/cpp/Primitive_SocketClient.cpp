@@ -3,15 +3,12 @@
  * @brief Interactive TCP client: sends lines typed by the user and prints the server's reply.
  */
 #include <iostream> // cout, cin
-#include <iostream> // cout, cin
 #include <sys/socket.h> // socket, bind, listen, accept
 #include <netinet/in.h> // IPPROTO_TCP, sockaddr_in,
                         // htons/ntohs, INADDR_ANY
 #include <unistd.h> // close
 #include <arpa/inet.h> // inet_ntop/inet_atop
 #include <string.h> // strlen
-#include <semaphore.h> // sem_init
-#include <pthread.h>
 #include <cstdio> // perror
 #include <cstdlib> // exit, atoi, EXIT_FAILURE
 
@@ -43,9 +40,16 @@ int main(int _argc, char** _argv) {
     sockaddr_in serverAddr;
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_port = htons(atoi(_argv[2]));      //Port über den der Dienst erreichbar ist
+    // inet_pton returns 1 on success, 0 if the string is not a valid IPv4 address
+    // (errno is not set, so no perror) and -1 if the address family is not supported
     int res = inet_pton(AF_INET, _argv[1], &serverAddr.sin_addr);
-    if (res == -1) {
+    if (res == 0) {
+       cerr << "invalid IP address: " << _argv[1] << endl;
+       close(commSocket);
+       exit(EXIT_FAILURE);
+    } else if (res == -1) {
        perror("inet_pton failed; IP could not be converted");
+       close(commSocket);
        exit(EXIT_FAILURE);
     }
 

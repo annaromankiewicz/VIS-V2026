@@ -14,9 +14,15 @@ import java.net.Socket;
  *
  * Implements IEnvService by sending text requests terminated with '#'
  * and parsing the server's replies into EnvData objects.
+ * Implements AutoCloseable, so it can be used in try-with-resources to
+ * make sure the connection is closed.
  */
-public class Environment_SocketClient implements IEnvService {
+public class Environment_SocketClient implements IEnvService, AutoCloseable {
 
+    /**
+     * socket connected to the server; closed by close()
+     */
+    private Socket mSocket;
     /**
      * stream for reading the server's replies
      */
@@ -37,10 +43,22 @@ public class Environment_SocketClient implements IEnvService {
 
         // communication with TCP C++ server -> TCP/IPv6
 
-        Socket activeSocket = new Socket(_ip, _port);
-        in = activeSocket.getInputStream();
-        out = activeSocket.getOutputStream();
+        mSocket = new Socket(_ip, _port);
+        in = mSocket.getInputStream();
+        out = mSocket.getOutputStream();
 
+    }
+
+    /**
+     * @brief Closes the streams and the socket, which ends the connection to the server.
+     * @throws IOException if closing the socket fails
+     */
+    @Override
+    public void close() throws IOException {
+        // closing the socket also closes its streams; in/out are closed first only for clarity
+        in.close();
+        out.close();
+        mSocket.close();
     }
 
 
@@ -67,7 +85,8 @@ public class Environment_SocketClient implements IEnvService {
     /**
      * @brief Sends "reqEnvData(<type>)#" and parses the reply.
      * @param _type name of the sensor
-     * @return measurement of the sensor with name and timestamp set
+     * @return measurement of the sensor with name and timestamp set,
+     *         or null if the server does not know the sensor
      * @throws IOException if sending or receiving fails
      */
     @Override
@@ -82,7 +101,9 @@ public class Environment_SocketClient implements IEnvService {
         // 123456789|123;235;23
 
         EnvData envData = envDataFabric(response);
-        envData.setmSensorName(_type);
+        if (envData != null) {      // null: unknown sensor ("no such datatype#")
+            envData.setmSensorName(_type);
+        }
         return envData;
     }
 
@@ -122,7 +143,8 @@ public class Environment_SocketClient implements IEnvService {
      *         or null if the server answered "no such datatype#".
      */
     private EnvData envDataFabric(String _response) {
-        if (_response.equalsIgnoreCase("no such datatype#")) {    // is never happening - parameter is from answer of server
+        // the server's reply for an unknown sensor; cleanResponse() has already removed the '#'
+        if (_response.equalsIgnoreCase("no such datatype")) {
             return null;
         }
         // 123456789|123;235;23
@@ -180,49 +202,54 @@ public class Environment_SocketClient implements IEnvService {
 
 
 
-/**
- * @brief Connects to the server and prints all sensor data once.
- * @param _argv [0] IP address of the server, [1] port of the server
- * @throws IOException if the communication with the server fails
- */
-public static void main(String[] _argv) throws IOException {
+    /**
+     * @brief Connects to the server and prints all sensor data once.
+     * @param _argv [0] IP address of the server, [1] port of the server
+     * @throws IOException if the communication with the server fails
+     */
+    public static void main(String[] _argv) throws IOException {
 
-    System.out.println("Starting Environment_SocketClient ...");
+        System.out.println("Starting Environment_SocketClient ...");
 
-    if (_argv.length != 2) {
-        System.out.println("Usage Environment_SocketClient <IP> <PORT>");
-        return;
-    }
-
-    int port = Integer.parseInt(_argv[1]);
-    IEnvService service = new Environment_SocketClient(_argv[0], port);
-    boolean listening = true;
-
-    System.out.println("Start while....");
-
-    while (listening) {
-        String[] sensors = service.reqEnvDataTypes();       // {light, noise, air}
-        for (String sensor : sensors) {                     // iterate and request data of reqEnvData(<datatype>)#
-            EnvData dataO = service.reqEnvData(sensor);
-            System.out.print(dataO);
-            System.out.println();
-        } // for sensors
-        System.out.println();
-        System.out.println();
-        EnvData[] dataOs = service.reqAll();
-        for (EnvData dataO : dataOs) {
-            System.out.println(dataO);
-        } // for data
-        try {
-            Thread.sleep(1000);
-        } catch (Exception _e) {
-            _e.printStackTrace();
+        if (_argv.length != 2) {
+            System.out.println("Usage Environment_SocketClient <IP> <PORT>");
+            return;
         }
-        listening = false;
-    } // while true
 
-    System.out.println("End while....");
-}
+        int port = Integer.parseInt(_argv[1]);
+        // try-with-resources: close() is called automatically, also if an exception occurs
+        try (Environment_SocketClient service = new Environment_SocketClient(_argv[0], port)) {
+            boolean listening = true;
+
+            System.out.println("Start while....");
+
+            while (listening) {
+                String[] sensors = service.reqEnvDataTypes();       // {light, noise, air}
+                for (String sensor : sensors) {                     // iterate and request data of reqEnvData(<datatype>)#
+                    EnvData dataO = service.reqEnvData(sensor);
+                    if (dataO == null) {
+                        System.out.println("no such datatype: " + sensor);
+                    } else {
+                        System.out.println(dataO);
+                    }
+                } // for sensors
+                System.out.println();
+                System.out.println();
+                EnvData[] dataOs = service.reqAll();
+                for (EnvData dataO : dataOs) {
+                    System.out.println(dataO);
+                } // for data
+                try {
+                    Thread.sleep(1000);
+                } catch (Exception _e) {
+                    _e.printStackTrace();
+                }
+                listening = false;
+            } // while true
+
+            System.out.println("End while....");
+        }
+    }
 
 
 
