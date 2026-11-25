@@ -1,13 +1,23 @@
 import org.apache.tools.ant.taskdefs.condition.Os
 
 plugins {
-   id("cpp-application")
+    id("cpp-application")
+}
+
+// Use Cygwin GCC only on Windows, and only if it is installed
+// (otherwise Gradle falls back to Visual C++ / the system compiler)
+if (Os.isFamily(Os.FAMILY_WINDOWS) && file("C:/cygwin64/bin").exists()) {
+    extensions.configure<NativeToolChainRegistry> {
+        register<Gcc>("cygwin") {
+            path(file("C:/cygwin64/bin"))
+        }
+    }
 }
 
 // ************************************************************
 // ENTER Name of the sub project ...
 // ************************************************************
-val subProjectName: String = "Primitive_SocketServer"
+val subProjectName: String = "Environment_SocketServer"
 // ************************************************************
 //
 // ************************************************************
@@ -37,27 +47,15 @@ tasks.register<Exec>("run") {
     group = "application"
     standardInput = System.`in`    // enable commandline input
 
-    var exeFile : String?
-    when {
-        Os.isFamily(Os.FAMILY_WINDOWS) -> {
-            exeFile = subProjectName + ".exe"
-        }
-
-        Os.isFamily(Os.FAMILY_MAC) -> {
-            exeFile = subProjectName
-        }
-
-        Os.isFamily(Os.FAMILY_UNIX) -> {
-            exeFile = subProjectName
-        }
-        else -> {
-            throw GradleException(":cpp:${subProjectName} run-target -> unknown OS family encountered")
-        }
+    val exeFile: String = when {
+        Os.isFamily(Os.FAMILY_WINDOWS) -> "$subProjectName.exe"
+        Os.isFamily(Os.FAMILY_MAC) -> subProjectName
+        Os.isFamily(Os.FAMILY_UNIX) -> subProjectName
+        else -> throw GradleException(":cpp:${subProjectName} run-target -> unknown OS family encountered")
     }
-        // Pfad zum Executable bestimmen (im build/install/... Ordner)
-    val exe = layout.buildDirectory.file(
-        "exe/main/debug/$exeFile"
-    )
+
+    // Pfad zum Executable bestimmen (im build/exe/... Ordner)
+    val exe = layout.buildDirectory.file("exe/main/debug/$exeFile")
 
     // Übergabeparameter beim Programmstart definieren ...
     args = listOf("4949")
@@ -66,55 +64,25 @@ tasks.register<Exec>("run") {
     executable = exe.get().asFile.absolutePath
 }
 
-
-/*
-// task to run cpp program
-tasks.register("run-old", Exec::class) {
-    dependsOn("build")         // make sure project has been built
-    group = "application"                // set task group
-    standardInput = System.`in`    // enable commandline input
-    val bDir: String = layout.buildDirectory.get().toString()
-    val exeDir:  String = "${bDir}/exe/main/debug/"
-    var exeFile: String?
-    when {
-        Os.isFamily(Os.FAMILY_WINDOWS) -> {
-            exeFile = subProjectName+ ".exe"
-			commandLine("cmd", "/k", exeDir+exeFile) // start command in cmd shell
-        }
-        Os.isFamily(Os.FAMILY_MAC) -> {
-            exeFile = subProjectName
-			// some Macs can work without "bash" and "-c"
-			commandLine("bash", "-c", exeDir+exeFile) // start command in cmd shell
-        }
-        Os.isFamily(Os.FAMILY_UNIX) -> {
-            exeFile = subProjectName
-			commandLine("bash", "-c", exeDir+exeFile) // start command in cmd shell
-        }
-        else -> { throw GradleException(":cpp:Hello run-target -> unknown OS family encountered")}
-    }
-}
-*/
-
-// task to run cpp program
+// task to stop a running server on the port
 tasks.register("kill", Exec::class) {
-    group = "application"                // set task group
+    group = "application"
     val port = 4949
     when {
-		// /c instead of /k on some Win11 machines ...
+        // /c (not /k): cmd must exit after the command, otherwise Gradle hangs
         Os.isFamily(Os.FAMILY_WINDOWS) -> {
-            commandLine("cmd", "/k", "for /f \"tokens=5\" %a in ('netstat -aon ^| findstr ${port}') do taskkill /F /PID %a")
+            commandLine("cmd", "/c", "for /f \"tokens=5\" %a in ('netstat -aon ^| findstr :${port} ^| findstr LISTENING') do taskkill /F /PID %a")
+            isIgnoreExitValue = true
         }
         Os.isFamily(Os.FAMILY_MAC) -> {
             commandLine("bash", "-c", "lsof -nti:${port} | xargs kill -9")
         }
         Os.isFamily(Os.FAMILY_UNIX) -> {
             commandLine("bash", "-c", "lsof -nti:${port} | xargs kill -9")
-            // commandLine("sh", "-c", "kill \"\$(lsof -t -i:$port)\"") // possible alternative
         }
         else -> { throw GradleException(":cpp:${subProjectName} kill-target -> unknown OS family encountered")}
     }
 }
 
-// tasks["run"].dependsOn("kill")   // CAREFUL: only suitable for the server side!
-// tasks["clean"].dependsOn("kill") // CAREFUL: only suitable for the server side!
-
+tasks["run"].dependsOn("kill")   // CAREFUL: only suitable for the server side!
+tasks["clean"].dependsOn("kill") // CAREFUL: only suitable for the server side!

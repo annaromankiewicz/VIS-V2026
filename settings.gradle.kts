@@ -11,13 +11,18 @@ rootProject.name = "VIS-2026"
 
 include(
     ":socket:cpp:Demo_SocketServer",
-     ":socket:cpp:Demo_SocketClient",
-     ":socket:cpp:Primitive_SocketServer",
-     ":socket:cpp:Primitive_SocketClient",
-     ":socket:cpp:Environment_SocketServer",
-     ":socket:java:Environment_SocketClient",
+    ":socket:cpp:Demo_SocketClient",
+    ":socket:cpp:Primitive_SocketServer",
+    ":socket:cpp:Primitive_SocketClient",
+    ":socket:cpp:Environment_SocketServer",
+    ":socket:java:Environment_SocketClient",
     ":socket:cpp:Hello",
-    ":test:Hello")
+    ":test:Hello",
+    ":rmi:Primitive_RmiClient",
+    ":rmi:Primitive_RmiInterface",
+    ":rmi:Primitive_RmiServer",
+)
+
 
 
 include(
